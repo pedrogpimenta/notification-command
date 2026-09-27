@@ -1,6 +1,9 @@
 package com.ppimenta.notificationcommand
 
+import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -22,12 +25,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.ppimenta.notificationcommand.data.AlertPreferences
 import com.ppimenta.notificationcommand.data.RuleEntity
 import com.ppimenta.notificationcommand.ui.PermissionsState
 import com.ppimenta.notificationcommand.ui.RuleViewModel
 import com.ppimenta.notificationcommand.ui.screens.PermissionsScreen
 import com.ppimenta.notificationcommand.ui.screens.RuleEditScreen
 import com.ppimenta.notificationcommand.ui.screens.RuleListScreen
+import com.ppimenta.notificationcommand.ui.screens.SettingsScreen
 import com.ppimenta.notificationcommand.ui.theme.NotificationCommandTheme
 
 class MainActivity : ComponentActivity() {
@@ -46,7 +51,24 @@ class MainActivity : ComponentActivity() {
 private sealed interface Screen {
     data object Permissions : Screen
     data object List : Screen
+    data object Settings : Screen
     data class Edit(val rule: RuleEntity?) : Screen
+}
+
+private fun alertToneLabel(context: Context, toneUri: Uri?): String {
+    val effectiveUri = toneUri ?: RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_ALARM)
+    val title = effectiveUri?.let { RingtoneManager.getRingtone(context, it)?.getTitle(context) }
+    return title ?: "System default"
+}
+
+private fun extractPickedRingtoneUri(intent: Intent?): Uri? {
+    intent ?: return null
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        intent.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+    } else {
+        @Suppress("DEPRECATION")
+        intent.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+    }
 }
 
 @Composable
@@ -73,6 +95,17 @@ private fun AppRoot(viewModel: RuleViewModel) {
     val postNotificationsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { permissionsState = PermissionsState.snapshot(context) }
+
+    var toneUri by remember { mutableStateOf(AlertPreferences.getToneUri(context)) }
+    val toneLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val pickedUri = extractPickedRingtoneUri(result.data)
+            AlertPreferences.setToneUri(context, pickedUri)
+            toneUri = pickedUri
+        }
+    }
 
     val rules by viewModel.rules.collectAsState()
 
@@ -119,6 +152,29 @@ private fun AppRoot(viewModel: RuleViewModel) {
             onEditRule = { rule -> screen = Screen.Edit(rule) },
             onDeleteRule = { rule -> viewModel.deleteRule(rule) },
             onSetEnabled = { rule, enabled -> viewModel.setEnabled(rule, enabled) },
+            onOpenSettings = { screen = Screen.Settings },
+        )
+
+        Screen.Settings -> SettingsScreen(
+            currentToneLabel = alertToneLabel(context, toneUri),
+            isDefaultTone = toneUri == null,
+            onPickTone = {
+                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                    putExtra(
+                        RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                        toneUri ?: RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_ALARM),
+                    )
+                }
+                toneLauncher.launch(intent)
+            },
+            onResetTone = {
+                AlertPreferences.setToneUri(context, null)
+                toneUri = null
+            },
+            onBack = { screen = Screen.List },
         )
 
         is Screen.Edit -> RuleEditScreen(

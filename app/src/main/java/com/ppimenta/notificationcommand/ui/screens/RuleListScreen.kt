@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,9 +39,19 @@ fun RuleListScreen(
     onEditRule: (RuleEntity) -> Unit,
     onDeleteRule: (RuleEntity) -> Unit,
     onSetEnabled: (RuleEntity, Boolean) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Notification Command") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Notification Command") },
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddRule) {
                 Icon(Icons.Filled.Add, contentDescription = "Add rule")

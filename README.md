@@ -12,6 +12,10 @@ default Android's Do Not Disturb configuration exempts alarms too — so this on
 both cases you mentioned. If your DND config has been customized to also block alarms, grant the
 app "Do Not Disturb access" from the in-app setup screen so it can request an exception.
 
+The tone itself is configurable (Settings → Choose tone, using the system ringtone picker
+filtered to alarm sounds); it's one tone for the whole app, not per rule. It defaults to your
+phone's default alarm sound if you never pick one.
+
 ## Alert behavior
 
 - **First message from a matched sender**: plays immediately.
